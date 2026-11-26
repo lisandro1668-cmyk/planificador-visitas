@@ -1,0 +1,795 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<title>Planificador de visitas</title>
+<link rel="icon" href="data:,">
+<meta name="theme-color" content="#1b64be">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Visitas">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icono-180.png">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+:root{
+  color-scheme: light;
+  --bg:#f4f5f7; --surface-1:#ffffff; --surface-2:#f0f2f5; --border:#e1e4e8;
+  --text-primary:#191919; --text-secondary:#5f6368; --accent:#1b64be; --accent-soft:#e8f1fc;
+  --series-1:#257de0; --series-2:#f47230; --series-3:#00b894; --series-4:#f2a600;
+  --good:#0aac23; --warning:#fbb315; --serious:#f18a59; --critical:#dc3c3d;
+  --good-ink:#006c10; --critical-ink:#b42324;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    color-scheme: dark;
+    --bg:#111214; --surface-1:#191919; --surface-2:#222326; --border:#33353a;
+    --text-primary:#efefef; --text-secondary:#9c9c9c; --accent:#6aabf1; --accent-soft:#1d2a3a;
+    --series-1:#338ced; --series-2:#e76624; --series-3:#00a888; --series-4:#d28e05;
+    --good-ink:#4fd065; --critical-ink:#ff8384;
+  }
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text-primary);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{background:var(--surface-1)}
+.top{display:flex;align-items:center;gap:12px;padding:10px 16px;flex-wrap:wrap}
+.top h1{font-size:17px;margin:0;font-weight:650}
+.top .sub{color:var(--text-secondary);font-size:13px}
+nav{display:flex;gap:2px;padding:0 10px;overflow-x:auto;scrollbar-width:none;position:sticky;top:0;z-index:1000;background:var(--surface-1);border-bottom:1px solid var(--border)}
+nav button{border:0;background:none;color:var(--text-secondary);padding:10px 14px;font:inherit;font-weight:550;border-bottom:3px solid transparent;cursor:pointer;white-space:nowrap}
+nav button.on{color:var(--accent);border-bottom-color:var(--accent)}
+main{max-width:1280px;margin:0 auto;padding:16px}
+section{display:none} section.on{display:block}
+.card{background:var(--surface-1);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px}
+.card h2{font-size:15px;margin:0 0 4px} .card .hint{color:var(--text-secondary);font-size:13px;margin:0 0 12px}
+.grid{display:grid;gap:16px} .g2{grid-template-columns:repeat(auto-fit,minmax(340px,1fr))} .g4{grid-template-columns:repeat(auto-fit,minmax(170px,1fr))}
+.kpi{background:var(--surface-1);border:1px solid var(--border);border-radius:12px;padding:14px 16px}
+.kpi .l{color:var(--text-secondary);font-size:13px} .kpi .v{font-size:28px;font-weight:700;font-variant-numeric:tabular-nums;margin-top:2px}
+.kpi .s{font-size:12.5px;color:var(--text-secondary)}
+.bar{height:8px;background:var(--surface-2);border-radius:4px;overflow:hidden;margin-top:8px}.bar>i{display:block;height:100%;background:var(--accent);border-radius:4px}
+.controls{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+.controls label{font-size:13px;color:var(--text-secondary);display:flex;gap:6px;align-items:center;max-width:100%}
+.controls select{max-width:100%;min-width:0}
+input,select,button.btn{font:inherit;font-size:16px;padding:7px 10px;border:1px solid var(--border);border-radius:8px;background:var(--surface-1);color:var(--text-primary)}
+button.btn{cursor:pointer;font-weight:550} button.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+a.btn{display:inline-flex;gap:6px;align-items:center;text-decoration:none;padding:8px 12px;border-radius:8px;background:var(--accent);color:#fff;font-weight:600;font-size:14px}
+a.btn.sec{background:var(--accent-soft);color:var(--accent)}
+.stop{border:1px solid var(--border);border-radius:12px;margin-bottom:10px;overflow:hidden;background:var(--surface-1)}
+.stop-h{display:flex;gap:10px;align-items:flex-start;padding:12px 14px;background:var(--surface-2)}
+.stop-n{flex:0 0 28px;height:28px;border-radius:50%;background:var(--accent);color:#fff;display:grid;place-items:center;font-weight:700;font-size:14px}
+.stop-t{flex:1;min-width:0} .stop-t b{display:block} .stop-t small{color:var(--text-secondary)}
+.doc{display:flex;gap:10px;padding:10px 14px;border-top:1px solid var(--border);align-items:flex-start}
+.doc.done{opacity:.5} .doc.done .dn{text-decoration:line-through}
+.doc input[type=checkbox]{width:22px;height:22px;margin-top:2px;flex:0 0 auto}
+.doc .dn{font-weight:600} .doc .dm{font-size:13px;color:var(--text-secondary)}
+.why{font-size:12.5px;margin-top:3px;color:var(--text-primary)}
+.tag{display:inline-block;font-size:11.5px;padding:1px 7px;border-radius:10px;background:var(--surface-2);border:1px solid var(--border);margin-right:4px;color:var(--text-secondary);white-space:nowrap}
+.tag.A{background:var(--accent-soft);color:var(--accent);border-color:transparent;font-weight:650}
+.st{display:inline-flex;gap:4px;align-items:center;font-size:12.5px;font-weight:600}
+.st.ok{color:var(--good-ink)} .st.pend{color:var(--critical-ink)}
+.dot{width:9px;height:9px;border-radius:50%;display:inline-block}
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--border);vertical-align:top}
+th{color:var(--text-secondary);font-weight:600;cursor:pointer;position:sticky;top:0;background:var(--surface-1);white-space:nowrap}
+td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
+tbody tr{cursor:pointer} tbody tr:hover{background:var(--surface-2)}
+.tablewrap{max-height:70vh;overflow:auto}
+#map{height:72vh;border-radius:12px;border:1px solid var(--border)}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:13px;color:var(--text-secondary);margin-top:8px}
+.legend span{display:inline-flex;gap:6px;align-items:center}
+.chart{position:relative;height:260px}
+.warn{background:#fff5e0;border:1px solid #f2c25c;color:#6b4a00;border-radius:10px;padding:10px 12px;font-size:14px;margin-bottom:12px}
+@media (prefers-color-scheme: dark){.warn{background:#2f2614;border-color:#7a5a12;color:#f5d58a}}
+dialog{border:0;border-radius:14px;padding:0;max-width:720px;width:calc(100% - 24px);background:var(--surface-1);color:var(--text-primary)}
+dialog::backdrop{background:rgba(0,0,0,.45)}
+.dlg-h{display:flex;justify-content:space-between;align-items:flex-start;padding:16px;border-bottom:1px solid var(--border);gap:10px}
+.dlg-b{padding:16px;max-height:70vh;overflow:auto}
+.kv{display:grid;grid-template-columns:140px 1fr;gap:6px 12px;font-size:14px} .kv div:nth-child(odd){color:var(--text-secondary)}
+.timeline{display:flex;gap:4px;flex-wrap:wrap;margin-top:6px}.timeline span{font-size:12px;padding:2px 8px;border-radius:8px;background:var(--surface-2);border:1px solid var(--border)}
+.daysum{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.daysum button{border:1px solid var(--border);background:var(--surface-1);border-radius:10px;padding:8px 12px;cursor:pointer;text-align:left;font:inherit;color:var(--text-primary)}
+.daysum button.on{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft)}
+.daysum b{display:block;font-size:13px} .daysum small{color:var(--text-secondary);font-size:12px}
+.muted{color:var(--text-secondary)}
+.sr{position:absolute;left:-9999px}
+#tOport,#tBaja,#tInst{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.grid>*{min-width:0}
+@media (max-width:640px){main{padding:10px} .g4{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px} .g2{grid-template-columns:minmax(0,1fr)}
+  .kpi{padding:10px 12px} .kpi .s{font-size:12px} table{font-size:12.5px} th,td{padding:6px 5px}.card{padding:12px}.kpi .v{font-size:24px}.top h1{font-size:15px}
+  .top{gap:8px;padding:8px 10px} .top .sub{order:5;flex-basis:100%;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .largo{display:none} .top .btn{padding:6px 10px}}
+</style>
+</head>
+<body>
+<header>
+  <div class="top">
+    <h1>Planificador de visitas</h1>
+    <span class="sub" id="sub"></span>
+    <span style="flex:1"></span>
+    <button class="btn" onclick="dlgAyuda.showModal()">?<span class="largo"> Ayuda</span></button>
+    <button class="btn" id="btnActualizar" title="Elegí el Excel que bajás de CallMed (Fichero → Médicos → botón Excel)">⟳ Actualizar<span class="largo"> con Excel de CallMed</span></button>
+    <input type="file" id="fileExcel" accept=".xls,.xlsx,.htm,.html" hidden>
+  </div>
+</header>
+<nav id="tabs">
+    <button data-t="hoy" class="on">Hoy</button>
+    <button data-t="semana">Plan del ciclo</button>
+    <button data-t="mapa">Mapa</button>
+    <button data-t="tablero">Tablero</button>
+    <button data-t="medicos">Médicos</button>
+</nav>
+<main>
+
+<!-- HOY -->
+<section id="hoy" class="on">
+  <div class="controls">
+    <label>Día <input type="date" id="hoyFecha"></label>
+    <label>Visitas por día <input type="number" id="cap" min="4" max="25" value="13" style="width:70px"></label>
+    <span class="muted" id="hoyInfo"></span>
+  </div>
+  <div id="hoyWarn"></div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px" id="hoyBtns"></div>
+  <div id="hoyLista"></div>
+  <p class="muted" style="font-size:13px">Tildar acá solo lo saca de la lista de hoy en este teléfono. La visita se sigue cargando en CallMed, que es lo oficial.</p>
+</section>
+
+<!-- SEMANA / CICLO -->
+<section id="semana">
+  <div class="card">
+    <h2>Plan de visitas</h2>
+    <p class="hint">Reparte los médicos pendientes en los días hábiles: cada día en una zona (Rosario o una gira), solo médicos que atienden ese día, empezando por los de mayor prioridad y sumando los más cercanos.</p>
+    <div class="controls">
+      <label>Planificar <select id="modo">
+        <option value="resto">Resto del ciclo (pendientes)</option>
+        <option value="proximo">Ciclo próximo completo</option>
+      </select></label>
+    </div>
+    <div id="semWarn"></div>
+    <div class="daysum" id="semDias"></div>
+    <div id="semDetalle"></div>
+  </div>
+</section>
+
+<!-- MAPA -->
+<section id="mapa">
+  <div class="controls">
+    <label>Estado <select id="mEstado"><option value="">Todos</option><option value="pend">Pendientes del ciclo</option><option value="ok">Visitados</option></select></label>
+    <label>Especialidad <select id="mEsp"><option value="">Todas</option></select></label>
+    <label>Potencial <select id="mPot"><option value="">Todos</option><option>A</option><option>B</option><option>C</option></select></label>
+    <label>Atiende <select id="mDia"><option value="">Cualquier día</option><option value="1">Lunes</option><option value="2">Martes</option><option value="3">Miércoles</option><option value="4">Jueves</option><option value="5">Viernes</option></select></label>
+  </div>
+  <div id="map"></div>
+  <div class="legend">
+    <span><i class="dot" style="background:var(--critical)"></i>Todos pendientes</span>
+    <span><i class="dot" style="background:var(--warning)"></i>Algunos pendientes</span>
+    <span><i class="dot" style="background:var(--good)"></i>Todos visitados</span>
+    <span>Tamaño del círculo = recetas totales del lugar</span>
+    <span id="mSinGeo"></span>
+  </div>
+</section>
+
+<!-- TABLERO -->
+<section id="tablero">
+  <div class="grid g4" id="kpis" style="margin-bottom:16px"></div>
+  <div class="grid g2">
+    <div class="card"><h2>Cobertura por ciclo</h2><p class="hint">% de los médicos fichados con visita en cada mes</p><div class="chart"><canvas id="cCob"></canvas></div></div>
+    <div class="card"><h2>Visitas por día trabajado</h2><p class="hint">Últimos 60 días con visitas. Línea = promedio</p><div class="chart"><canvas id="cDia"></canvas></div></div>
+    <div class="card"><h2>Ciclo actual por potencial</h2><p class="hint">Visitados vs pendientes. Los A son los que no pueden quedar afuera</p><div class="chart"><canvas id="cPot"></canvas></div></div>
+    <div class="card"><h2>Médicos por especialidad</h2><p class="hint">Visitados y pendientes del ciclo actual</p><div class="chart"><canvas id="cEsp"></canvas></div></div>
+    <div class="card"><h2>Recetas vs participación Baliarda</h2><p class="hint">Cada punto es un médico. Arriba a la izquierda: recetan mucho y poco Baliarda = oportunidad</p><div class="chart"><canvas id="cScat"></canvas></div></div>
+    <div class="card"><h2>Participación Baliarda por período</h2><p class="hint">Promedio ponderado por recetas en los 4 períodos (TP1–TP4) que informa CallMed y el valor actual</p><div class="chart"><canvas id="cShare"></canvas></div></div>
+    <div class="card"><h2>Por localidad</h2><p class="hint">Médicos fichados y cuántos faltan este ciclo</p><div class="chart"><canvas id="cLoc"></canvas></div></div>
+    <div class="card"><h2>Días desde la última visita</h2><p class="hint">Cuántos médicos hay en cada rango</p><div class="chart"><canvas id="cSin"></canvas></div></div>
+  </div>
+  <div class="grid g2">
+    <div class="card"><h2>Top oportunidades</h2><p class="hint">Recetan mucho, Baliarda participa poco y tienen buen potencial</p><div id="tOport"></div></div>
+    <div class="card"><h2>Participación en baja</h2><p class="hint">La participación actual de Baliarda está por debajo de su mejor período</p><div id="tBaja"></div></div>
+  </div>
+  <div class="card"><h2>Instituciones</h2><p class="hint">Dónde se concentran los médicos: una sola parada, muchas visitas</p><div id="tInst"></div></div>
+</section>
+
+<!-- MEDICOS -->
+<section id="medicos">
+  <div class="controls">
+    <input id="q" placeholder="Buscar nombre, matrícula, domicilio…" style="flex:1;min-width:200px">
+    <select id="fEsp"><option value="">Todas las especialidades</option></select>
+    <select id="fEst"><option value="">Todos</option><option value="pend">Pendientes del ciclo</option><option value="ok">Visitados</option></select>
+    <select id="fLoc"><option value="">Todas las localidades</option></select>
+  </div>
+  <div class="card" style="padding:0"><div class="tablewrap"><table id="tabla"><thead></thead><tbody></tbody></table></div></div>
+  <p class="muted" id="tCount"></p>
+</section>
+</main>
+
+<dialog id="dlgClave"><form id="formClave" class="dlg-b" style="max-width:360px">
+<div style="font-size:17px;font-weight:700;margin-bottom:6px">Planificador de visitas</div>
+<p class="muted" style="margin:0 0 12px;font-size:14px">Los datos están cifrados. Ingresá la clave (se pide una sola vez en este equipo).</p>
+<input id="clave" type="password" autocomplete="current-password" placeholder="Clave" style="width:100%;font-size:16px;margin-bottom:10px">
+<button class="btn primary" style="width:100%">Abrir</button>
+<p id="claveErr" style="color:var(--critical-ink);font-size:13.5px;min-height:18px;margin:8px 0 0"></p>
+</form></dialog>
+<dialog id="dlgAyuda"><div class="dlg-h"><b>Cómo se usa</b><button class="btn" onclick="dlgAyuda.close()">Cerrar</button></div><div class="dlg-b" style="font-size:14.5px">
+<p><b>Actualizar los datos</b> (una vez por semana, o cuando quieras):</p>
+<ol><li>En CallMed: <i>Fichero → Médicos</i>, botón <b>Excel</b>, aceptar. Se baja <code>Medicos.xls</code>.</li>
+<li>Acá: botón <b>⟳ Actualizar con Excel de CallMed</b> y elegir ese archivo.</li>
+<li>Si hay direcciones nuevas, las ubica solo (tarda unos segundos por dirección).</li></ol>
+<p>Los datos quedan guardados en este navegador: la próxima vez que abras el archivo ya están.</p>
+<p><b>Hoy</b>: la lista del día en orden de recorrido. Si es el día de hoy, solo muestra consultorios que siguen abiertos. Tildar un médico solo lo marca acá; la visita se carga en CallMed como siempre.</p>
+<p><b>Plan del ciclo</b>: reparte los pendientes en los días hábiles que quedan (o arma el ciclo próximo completo). Primero los de potencial A y los que atienden pocos días.</p>
+<p><b>Prioridad</b>: suma cuánto receta y cuánto de eso no es Baliarda (oportunidad), el potencial, los días sin visita y si bajó la participación.</p>
+<p><b>En el iPhone</b>: abrila en Safari, tocá <i>Compartir</i> → <b>Agregar a pantalla de inicio</b>. Así queda como una app y el iPhone no borra los datos guardados.</p>
+<p><button class="btn" type="button" onclick="olvidarDatos()">Borrar los datos de este equipo</button></p>
+<p class="muted">Necesita internet para el mapa, los gráficos y Google Maps. Los datos de los médicos no salen de este equipo (para ubicar direcciones nuevas se consulta solo la dirección).</p>
+</div></dialog>
+<dialog id="dlgProg"><div class="dlg-b"><b>Actualizando datos</b><p id="prog" style="margin:10px 0 14px"></p><button class="btn primary" id="progOk" hidden onclick="dlgProg.close()">Listo</button></div></dialog>
+<dialog id="dlg"><div class="dlg-h"><div id="dlgTit"></div><button class="btn" onclick="dlg.close()">Cerrar</button></div><div class="dlg-b" id="dlgBody"></div></dialog>
+
+<script id="base-emb" type="application/json"></script>
+<script>
+/* Procesamiento del Excel de CallMed en el navegador (misma lógica que scripts/armar_datos.py).
+   Todo queda en el equipo de quien lo usa; solo se consultan servicios públicos para
+   ubicar direcciones nuevas (Nominatim/OSM, solo la dirección) y tiempos de manejo (OSRM, solo coordenadas). */
+
+const COLS_USADAS = ['id','dbmatr','DBNOMB','ESP_CODIGO','Domicilio','DBVIS1','DBVIS2','DBVIS3','DBVIS4','DBVIS5','DBVIS6',
+  'DBHDE1','DBHha1','DBHDE2','DBHha2','DBZONA','TotalP','DBEMai','DBPote','porclab','dbcate','DBCPOS',
+  'DBME01','DBME02','DBME03','DBME04','DBME05','DBME06','DBME07','DBME08','DBME09','DBME10','DBME11','DBME12',
+  'LugarVisita','HONOMB','TipoVisita','cumplido','dbos1','wvisita1','wvisita2','TP1','TP2','TP3','TP4'];
+
+const ESP_N = {CL:'Clínica médica',EN:'Endocrinología',HE:'Hematología',CA:'Cardiología',DI:'Diabetología',PS:'Psiquiatría',
+  TO:'Tocoginecología',GI:'Ginecología',NE:'Neurología',CI:'Cirugía',UR:'Urología',GA:'Gastroenterología',PE:'Pediatría',
+  TR:'Traumatología',RE:'Reumatología',NU:'Nutrición',GE:'Geriatría',DE:'Dermatología',ON:'Oncología',OT:'Otorrinolaringología'};
+const POT_L = {'1':'A','2':'B','3':'C'}, POT_PESO = {A:1, B:.7, C:.45};
+const CP_LOC = {'2170':'Casilda','2132':'Funes','2173':'Chabás','2183':'Arequito','2187':'Arteaga','2185':'San José de la Esquina','2181':'Los Molinos'};
+const CENTROS = {'Rosario':[-32.955,-60.680,.15],'Funes':[-32.920,-60.815,.05],'Casilda':[-33.044,-61.168,.03],'Chabás':[-33.245,-61.357,.02],
+  'Arequito':[-33.147,-61.469,.02],'Arteaga':[-33.091,-61.791,.02],'Los Molinos':[-33.105,-61.324,.02],'San José de la Esquina':[-33.113,-61.705,.02],'Roldán':[-32.898,-60.906,.04]};
+
+/* --- leer el .xls de CallMed (es una tabla HTML en latin-1) --- */
+function leerExcelCallMed(html){
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  const filas = [...doc.querySelectorAll('tr')].map(tr => [...tr.querySelectorAll('td,th')].map(td => td.textContent.trim()));
+  // en el export la fila de encabezados no siempre está dentro de <tr>: buscarla por contenido
+  // el parser HTML mete la fila de encabezados suelta en un <tr>; se busca por contenido
+  const hdr = filas.find(f => f.includes('dbmatr') && f.includes('DBNOMB'));
+  if (!hdr) throw new Error('No encontré las columnas del fichero (¿es el Excel del botón "Excel" de Médicos en CallMed?)');
+  const datos = filas.slice(filas.indexOf(hdr) + 1);
+  const faltan = COLS_USADAS.filter(c => !hdr.includes(c));
+  if (faltan.length > 5) throw new Error('El archivo no parece el Excel del fichero de médicos de CallMed (faltan columnas: ' + faltan.slice(0,6).join(', ') + ')');
+  return datos.filter(f => f.length >= hdr.length - 2 && /^\d+$/.test(f[hdr.indexOf('dbmatr')] || ''))
+    .map(f => Object.fromEntries(COLS_USADAS.map(c => [c, f[hdr.indexOf(c)] ?? ''])));
+}
+
+/* --- helpers --- */
+const num = x => { const v = parseFloat(String(x ?? '').replace(',', '.')); return isNaN(v) ? 0 : v; };
+const hhmm = x => { x = Math.round(num(x)); return x ? String(Math.floor(x/100)).padStart(2,'0') + ':' + String(x%100).padStart(2,'0') : null; };
+function diasDe(vals){ const s = new Set(); vals.forEach(v => { v = Math.round(num(v)); if (v === 7) [1,2,3,4,5].forEach(d => s.add(d)); else if (v >= 1 && v <= 5) s.add(v); }); return [...s].sort(); }
+function fechaVisita(code, mes, hoy){
+  code = Math.round(num(code)); if (!code) return null;
+  const dia = Math.floor(code / 100), m = code % 100; if (m !== mes || dia < 1 || dia > 31) return null;
+  const anio = mes > hoy.getMonth() + 1 ? hoy.getFullYear() - 1 : hoy.getFullYear();   // meses "futuros" son del año pasado
+  return `${anio}-${String(mes).padStart(2,'0')}-${String(dia).padStart(2,'0')}`;
+}
+function lugarKey(dom){
+  let d = dom.replace(/\(.*?\)/g, '').toUpperCase().replace(/BV\./g, 'BV ').replace(/BV N /g, 'BV ').replace(/Ñ/g, 'N');
+  d = d.replace(/^\s*BV\s+/, '').replace(/\b(SANTA FE|ROSARIO|CASILDA|FUNES)\b/g, '');
+  const toks = d.split(/\s+/).filter(Boolean);
+  const nums = toks.filter(t => /^\d{2,}$/.test(t)), calle = toks.filter(t => !/^\d+$/.test(t)).slice(-2);
+  return calle.join(' ') + ' ' + (nums.length ? nums[nums.length-1] : '');
+}
+const titulo = s => s.toLowerCase().replace(/(^|[\s.(/-])([a-záéíóúñü])/g, (a,b,c) => b + c.toUpperCase());
+
+/* --- geocodificación (Nominatim, acotada a la localidad) --- */
+function limpiarDom(dom){
+  let cp = (dom.match(/\(S?(\d{4})/) || [])[1] || '';
+  let d = dom.replace(/\(.*?\)/g, ' ').replace('SANTA FE', ' ').replace(/(\d)\s+(ENTRE|ESQ|ESQUINA)\b.*$/, '$1 ');
+  let toks = d.replace(/\./g, '. ').split(/\s+/).filter(Boolean);
+  let loc = cp.startsWith('20') ? 'Rosario' : CP_LOC[cp];
+  while (toks.length && /^[A-ZÑÁÉÍÓÚ]+$/i.test(toks[toks.length-1]) && !/\d/.test(toks[toks.length-1])) { const l = toks.pop(); if (!loc) loc = titulo(l); }
+  const idx = toks.map((t,i) => (/^\d{2,}$/.test(t) && i > 0) ? i : -1).filter(i => i >= 0);
+  if (!idx.length) return {calle:null, loc: loc || 'Rosario', cp};
+  const i = idx[idx.length-1];
+  let calle = toks.slice(0, i).join(' ');
+  calle = calle.replace(/^(BV|BVARD|BOULEVARD)\.?\s*(N\.?\s+)?/, 'Bulevar ').replace(/^(AV|AVDA|AVENIDA)\.?\s*/, 'Avenida ')
+    .replace(/^PJE\.?\s*/, 'Pasaje ').replace(/^PTE\.?\s+H\.?\s+/, 'Hipólito ').replace(/^GRAL\.?\s*/, 'General ').replace(/\s+/g, ' ').trim();
+  return {calle: toks[i] + ' ' + titulo(calle), loc: loc || 'Rosario', cp};
+}
+const pausa = ms => new Promise(r => setTimeout(r, ms));
+async function nominatim(params, loc){
+  const c = CENTROS[loc]; const extra = c ? {viewbox: `${c[1]-c[2]},${c[0]+c[2]},${c[1]+c[2]},${c[0]-c[2]}`, bounded: 1} : {};
+  const q = new URLSearchParams({...params, ...extra, format: 'json', limit: 1, countrycodes: 'ar'});
+  await pausa(1100);
+  try { const r = await (await fetch('https://nominatim.openstreetmap.org/search?' + q)).json(); return r[0] ? {lat: +r[0].lat, lon: +r[0].lon} : null; }
+  catch(e){ return null; }
+}
+async function geocodificar(dom, manual){
+  const {calle, loc, cp} = limpiarDom(dom);
+  const intentos = [];
+  if (manual && manual[dom]) { const [c, l] = manual[dom].split(/,(.+)/).map(s => s.trim()); intentos.push(['exacta', {street: c, city: l, state: 'Santa Fe'}, l]); }
+  if (calle) {
+    intentos.push(['exacta', {street: calle, city: loc, state: 'Santa Fe'}, loc]);
+    if (cp) intentos.push(['exacta', {street: calle, postalcode: cp, state: 'Santa Fe'}, loc]);
+    intentos.push(['libre', {q: `${calle}, ${loc}, Santa Fe, Argentina`}, loc]);
+  }
+  for (const [nivel, p, l] of intentos) { const r = await nominatim(p, l); if (r) return {...r, nivel, loc: l, v: 2}; }
+  const c = CENTROS[loc];
+  return c ? {lat: c[0], lon: c[1], nivel: 'localidad', loc, v: 2} : null;
+}
+
+/* --- tiempos de manejo (OSRM) --- */
+async function matrizOSRM(lugares, progreso){
+  const keys = Object.keys(lugares).sort(), n = keys.length, B = 45;
+  const min = keys.map(() => Array(n).fill(null));
+  const bloques = []; for (let i = 0; i < n; i += B) bloques.push([...Array(Math.min(B, n - i)).keys()].map(k => k + i));
+  let hechos = 0;
+  for (const src of bloques) for (const dst of bloques) {
+    const idx = [...src, ...dst.filter(j => !src.includes(j))];
+    const coords = idx.map(i => `${lugares[keys[i]][1].toFixed(6)},${lugares[keys[i]][0].toFixed(6)}`).join(';');
+    const url = `https://router.project-osrm.org/table/v1/driving/${coords}?sources=${src.map(i => idx.indexOf(i)).join(';')}&destinations=${dst.map(j => idx.indexOf(j)).join(';')}`;
+    let r = null;
+    for (let k = 0; k < 4 && !r; k++) { try { const j = await (await fetch(url)).json(); if (j.code === 'Ok') r = j; else await pausa(3000 + k*4000); } catch(e){ await pausa(3000 + k*4000); } }
+    if (!r) throw new Error('No respondió el servicio de rutas (OSRM). Probá de nuevo en un rato.');
+    src.forEach((i, a) => dst.forEach((j, b) => { const v = r.durations[a][b]; min[i][j] = v == null ? null : Math.round(v / 6) / 10; }));
+    progreso && progreso(`Tiempos de manejo: ${++hechos}/${bloques.length ** 2}`);
+    await pausa(1200);
+  }
+  return {keys, min, fuente: 'OSRM / OpenStreetMap (auto)'};
+}
+
+/* --- armar médicos a partir de filas + coordenadas --- */
+function construirMedicos(filas, geo, hoy = new Date()){
+  hoy = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate(), 12);
+  const out = filas.map(m => {
+    const g = geo[m.Domicilio] || {};
+    const t1 = diasDe([m.DBVIS1, m.DBVIS2, m.DBVIS3]), t2 = diasDe([m.DBVIS4, m.DBVIS5, m.DBVIS6]);
+    const turnos = [];
+    if (t1.length && hhmm(m.DBHDE1)) turnos.push({dias: t1, desde: hhmm(m.DBHDE1), hasta: hhmm(m.DBHha1)});
+    if (t2.length && hhmm(m.DBHDE2)) turnos.push({dias: t2, desde: hhmm(m.DBHDE2), hasta: hhmm(m.DBHha2)});
+    const visitas = [...Array(12).keys()].map(i => fechaVisita(m['DBME' + String(i+1).padStart(2,'0')], i+1, hoy)).filter(Boolean).sort();
+    const pres = Math.round(num(m.TotalP)), share = num(m.porclab), tps = [1,2,3,4].map(i => num(m['TP' + i]));
+    const pot = POT_L[m.DBPote] || 'C';
+    const cp = (m.Domicilio.match(/\(S?(\d{4})/) || [])[1] || m.DBCPOS;
+    const loc = cp.startsWith('20') ? 'Rosario' : (CP_LOC[cp] || g.loc || cp);
+    const brecha = pres * (1 - share / 100) * POT_PESO[pot];
+    return {
+      id: m.id, matr: m.dbmatr, nombre: titulo(m.DBNOMB), esp: m.ESP_CODIGO, espNombre: ESP_N[m.ESP_CODIGO] || m.ESP_CODIGO,
+      dom: titulo(m.Domicilio.replace(/\s*\(.*?\)/g, '').replace(/\s+SANTA FE$/, '')), domRaw: m.Domicilio, cp, loc,
+      lugar: lugarKey(m.Domicilio), lat: g.lat ?? null, lon: g.lon ?? null, geoNivel: g.nivel || null,
+      inst: m.HONOMB || null, lugarVisita: m.LugarVisita, tipo: m.TipoVisita === 'Gira' ? 'Gira' : 'Ciudad asiento',
+      turnos, horarioTxt: [m.wvisita1, m.wvisita2].filter(Boolean).join(' / '),
+      pot, cat: m.dbcate, pres, share, tps, brecha: Math.round(brecha), pami: m.dbos1 === 'PAMI', tieneMail: !!m.DBEMai,
+      cumplido: m.cumplido === '1', ultima: visitas.length ? visitas[visitas.length-1] : null, visitas,
+    };
+  });
+  const mx = Math.max(...out.map(o => Math.log1p(o.brecha))) || 1;
+  out.forEach(o => {
+    o.oport = Math.round(100 * Math.log1p(o.brecha) / mx);
+    o.diasSin = o.ultima ? Math.round((hoy - new Date(o.ultima + 'T12:00:00')) / 864e5) : 120;
+    o.caida = Math.round(Math.max(0, Math.max(...o.tps, 0) - o.share) * 10) / 10;   // contra su mejor período
+    const bonus = {A: 25, B: 10, C: 0}[o.pot];
+    o.prior = Math.min(100, Math.round(o.oport * .5 + Math.min(o.diasSin, 90) / 90 * 20 + Math.max(0, Math.min(o.caida, 25) - 4) / 21 * 10 + bonus));
+  });
+  unirLugares(out);
+  return out;
+}
+function unirLugares(out, metros = 150){
+  const grupos = {}; out.forEach(o => (grupos[o.lugar] = grupos[o.lugar] || []).push(o));
+  const keys = Object.keys(grupos).sort((a, b) => grupos[b].length - grupos[a].length || (a < b ? -1 : 1));
+  const padre = Object.fromEntries(keys.map(k => [k, k])), pos = Object.fromEntries(keys.map(k => [k, [grupos[k][0].lat, grupos[k][0].lon]]));
+  keys.forEach((a, i) => { if (padre[a] !== a || pos[a][0] == null) return;
+    keys.slice(i + 1).forEach(b => { if (padre[b] !== b || pos[b][0] == null) return;
+      const dy = (pos[a][0] - pos[b][0]) * 111000, dx = (pos[a][1] - pos[b][1]) * 93000;
+      if (Math.hypot(dx, dy) <= metros) padre[b] = a; }); });
+  out.forEach(o => { const k = padre[o.lugar]; if (k !== o.lugar) { o.lugar = k; [o.lat, o.lon] = pos[k]; } });
+}
+
+/* --- actualización completa desde un archivo --- */
+async function actualizarDesdeExcel(file, base, progreso){
+  const buf = await file.arrayBuffer();
+  const html = new TextDecoder('iso-8859-1').decode(buf);
+  const filas = leerExcelCallMed(html);
+  if (!filas.length) throw new Error('El archivo no tiene médicos.');
+  const geo = {...base.geo};
+  const nuevos = [...new Set(filas.map(f => f.Domicilio))].filter(d => !geo[d]);
+  for (let i = 0; i < nuevos.length; i++) { progreso(`Ubicando direcciones nuevas: ${i+1}/${nuevos.length}`); geo[nuevos[i]] = await geocodificar(nuevos[i], base.manual); }
+  const meds = construirMedicos(filas, geo);
+  const lugares = {}; meds.forEach(m => { if (m.lat != null && !lugares[m.lugar]) lugares[m.lugar] = [m.lat, m.lon]; });
+  let T = base.tiempos;
+  const faltan = !T || Object.keys(lugares).some(k => !T.keys.includes(k));
+  if (faltan) T = await matrizOSRM(lugares, progreso);
+  return {filas, geo, tiempos: T, fecha: new Date().toISOString(), nuevos: nuevos.length, recalculoTiempos: faltan};
+}
+
+</script>
+<script>
+const $=s=>document.querySelector(s);
+/* almacenamiento seguro: algunos celulares no dejan guardar datos a un archivo .html abierto suelto */
+const ST=(()=>{ const mem={}; let ok=true;
+  try{ const k='__pv_test'; localStorage.setItem(k,'1'); localStorage.removeItem(k); }catch(e){ ok=false; }
+  return { ok,
+    get:k=>{ try{ return ok?localStorage.getItem(k):(k in mem?mem[k]:null); }catch(e){ return mem[k]??null; } },
+    put:(k,v)=>{ try{ if(ok){ localStorage.setItem(k,v); return true; } }catch(e){} mem[k]=String(v); return false; },
+    del:k=>{ try{ if(ok) localStorage.removeItem(k); }catch(e){} delete mem[k]; } }; })();
+const DIAS=['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+const DIAS_L=['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
+const fmt=n=>Math.round(n).toLocaleString('es-AR');
+const css=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+let D, M, byId={};
+const iso=d=>d.toISOString().slice(0,10);
+const parseD=s=>{const [y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d,12)};
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+let T=null, TI={};   // matriz de minutos de manejo (OSRM) por clave de lugar
+function lineaRecta(a,b){ if(a.lat==null||b.lat==null) return 8; const R=6371,t=Math.PI/180;
+  const x=(b.lon-a.lon)*t*Math.cos((a.lat+b.lat)/2*t), y=(b.lat-a.lat)*t; return Math.sqrt(x*x+y*y)*R; }
+/* minutos de manejo entre dos paradas (o docs): matriz real si existe; si no, estimado por línea recta */
+function km(a,b){ const ka=a.key||a.lugar, kb=b.key||b.lugar;
+  if(ka===kb) return 0;
+  if(T && ka in TI && kb in TI){ const v=T.min[TI[ka]][TI[kb]]; if(v!=null) return v; }
+  return lineaRecta(a,b)*2.2 + 2; }
+function zona(m){ return (m.loc==='Rosario'||m.loc==='Funes') ? 'Rosario y Funes' : 'Gira Casilda y pueblos'; }
+let HORA_MIN=0;   // HHMM: si se planifica el día de hoy, ignora turnos que ya terminaron
+function turnoDia(m,wd){ return m.turnos.filter(t=>t.dias.includes(wd) && +t.hasta.replace(':','')>HORA_MIN); }
+function porQue(m){
+  const r=[];
+  if(m.pres>=500) r.push(`receta ${fmt(m.pres)}`);
+  if(m.share<5 && m.pres>=100) r.push(`solo ${m.share}% Baliarda`);
+  else if(m.share>=20) r.push(`${m.share}% Baliarda: cuidarlo`);
+  if(m.caida>=5) r.push(`bajó ${Math.round(m.caida)} pts vs su mejor período`);
+  if(m.diasSin>=45) r.push(`${m.diasSin} días sin visita`);
+  if(m.pot==='A') r.push('potencial A');
+  return r.join(' · ');
+}
+function diasHabiles(desde, hasta){ const out=[]; const d=new Date(desde); while(d<=hasta){ const w=d.getDay(); if(w>=1&&w<=5) out.push(new Date(d)); d.setDate(d.getDate()+1);} return out; }
+
+/* ===== Planificador ===== */
+const pe=m=>m.prior+(m._urg||0);   // prioridad + urgencia por pocos días disponibles
+function planDia(fecha, pool, cap){
+  const wd=fecha.getDay();
+  const cand=pool.filter(m=>turnoDia(m,wd).length);
+  if(!cand.length) return null;
+  // elegir zona del día: la que concentra más prioridad (top cap)
+  const zs={}; cand.forEach(m=>(zs[zona(m)]=zs[zona(m)]||[]).push(m));
+  let best=null,bs=-1;
+  for(const [z,arr] of Object.entries(zs)){ const s=arr.map(m=>pe(m)+(m.pot==='A'?40:0)).sort((a,b)=>b-a).slice(0,cap).reduce((a,b)=>a+b,0)*(z==='Rosario y Funes'?1:1.08); if(s>bs){bs=s;best=z;} }
+  const zc=zs[best];
+  // agrupar por lugar
+  const L={}; zc.forEach(m=>{ (L[m.lugar]=L[m.lugar]||{key:m.lugar,docs:[],lat:m.lat,lon:m.lon,dom:m.dom}).docs.push(m); if(L[m.lugar].lat==null&&m.lat!=null){L[m.lugar].lat=m.lat;L[m.lugar].lon=m.lon;} });
+  const stops=Object.values(L).map(s=>{ s.docs.sort((a,b)=>pe(b)-pe(a)); s.score=s.docs.reduce((a,m)=>a+pe(m),0); return s; });
+  const elegidos=[]; let n=0;
+  const usados=new Set();
+  const tomar=s=>{ const lugar=Math.max(0,cap-n); if(!lugar) return; const docs=s.docs.slice(0,lugar); n+=docs.length; elegidos.push({...s,docs}); usados.add(s.key); };
+  // primero los lugares con médicos de potencial A pendientes (no pueden quedar afuera), después la mejor parada
+  const conA=stops.filter(s=>s.docs.some(m=>m.pot==='A')).sort((a,b)=>b.score-a.score);
+  conA.forEach(s=>{ if(n<cap) tomar(s); });
+  if(!elegidos.length) tomar(stops.slice().sort((a,b)=>pe(b.docs[0])-pe(a.docs[0]))[0]);
+  while(n<cap){
+    let mejor=null,mv=-1;
+    for(const s of stops){ if(usados.has(s.key)) continue;
+      const dmin=Math.min(...elegidos.map(e=>km(e,s)));
+      const v=s.docs.slice(0,cap-n).reduce((a,m)=>a+pe(m),0)/(1+dmin*0.25);
+      if(v>mv){mv=v;mejor=s;} }
+    if(!mejor) break; tomar(mejor);
+  }
+  // ordenar: por hora de inicio (mañana/tarde) y luego vecino más cercano
+  const inicio=s=>Math.min(...s.docs.map(m=>turnoDia(m,wd).map(t=>+t.desde.replace(':','')).reduce((a,b)=>Math.min(a,b),2400)));
+  elegidos.forEach(s=>{ s.ini=inicio(s); s.fin=Math.max(...s.docs.map(m=>turnoDia(m,wd).map(t=>+t.hasta.replace(':','')).reduce((a,b)=>Math.max(a,b),0))); });
+  const man=elegidos.filter(s=>s.ini<1300), tar=elegidos.filter(s=>s.ini>=1300);
+  const nn=(arr,start)=>{ const res=[]; let cur=start; const rest=arr.slice().sort((a,b)=>a.ini-b.ini);
+    if(!cur && rest.length){ cur=rest.shift(); res.push(cur);}
+    while(rest.length){ rest.sort((a,b)=>km(cur,a)-km(cur,b)+ (a.fin<b.fin?-0.5:0)); cur=rest.shift(); res.push(cur);}
+    return dosOpt(res, start); };
+  const o1=nn(man,null); const orden=[...o1, ...nn(tar,o1[o1.length-1]||null)];
+  let dist=0; for(let i=1;i<orden.length;i++) dist+=km(orden[i-1],orden[i]);
+  return {fecha, zona:best, stops:orden, n, km:dist};
+}
+/* 2-opt: invierte tramos si acorta el total de minutos (con la primera parada fija si no hay inicio) */
+function dosOpt(r, start){
+  if(r.length<4) return r;
+  const cost=arr=>{ let c=start?km(start,arr[0]):0; for(let i=1;i<arr.length;i++) c+=km(arr[i-1],arr[i]); return c; };
+  let best=r.slice(), bc=cost(best), mejora=true, vueltas=0;
+  while(mejora && vueltas++<50){ mejora=false;
+    for(let i=start?0:1;i<best.length-1;i++) for(let k=i+1;k<best.length;k++){
+      const cand=[...best.slice(0,i), ...best.slice(i,k+1).reverse(), ...best.slice(k+1)];
+      const c=cost(cand); if(c<bc-0.1){ best=cand; bc=c; mejora=true; } } }
+  return best;
+}
+function planificar(fechas, pool, cap){
+  pool=pool.slice(); const dias=[];
+  for(let i=0;i<fechas.length;i++){ const f=fechas[i];
+    // urgencia: cuantos menos días hábiles restantes atiende un médico, antes hay que ubicarlo
+    const resto=fechas.slice(i);
+    pool.forEach(m=>{ const n=resto.filter(d=>turnoDia(m,d.getDay()).length).length; m._urg = n<=1?70 : n<=2?40 : n<=4?15 : 0; });
+    const p=planDia(f,pool,cap); if(!p){dias.push({fecha:f,stops:[],n:0,zona:'—',km:0});continue;}
+    const ids=new Set(p.stops.flatMap(s=>s.docs.map(m=>m.id))); pool=pool.filter(m=>!ids.has(m.id)); dias.push(p); }
+  M.forEach(m=>delete m._urg);
+  return {dias, sobran:pool};
+}
+
+/* ===== Render helpers ===== */
+function gmapsDir(stops){
+  const pts=stops.map(s=> s.lat!=null&&s.docs[0].geoNivel!=='localidad' ? `${s.lat},${s.lon}` : encodeURIComponent(s.docs[0].domRaw.replace(/\(.*?\)/g,'')+', Argentina'));
+  if(!pts.length) return '#';
+  const dest=pts[pts.length-1], way=pts.slice(0,-1).slice(0,9);
+  return `https://www.google.com/maps/dir/?api=1&travelmode=driving&destination=${dest}${way.length?'&waypoints='+way.join('%7C'):''}`;
+}
+function gmapsOne(m){ return m.lat!=null&&m.geoNivel!=='localidad' ? `https://www.google.com/maps/search/?api=1&query=${m.lat},${m.lon}` : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(m.domRaw.replace(/\(.*?\)/g,'')+', Argentina')}`; }
+function docRow(m,wd,check,stopDom){
+  const t=turnoDia(m,wd).map(t=>`${t.desde}–${t.hasta}`).join(' / ');
+  const done=check && ST.get('v:'+iso(new Date())+':'+m.id);
+  return `<div class="doc ${done?'done':''}" data-id="${m.id}">
+    ${check?`<input type="checkbox" ${done?'checked':''} aria-label="Visto">`:''}
+    <div style="flex:1;min-width:0"><div class="dn">${esc(m.nombre)} <span class="tag ${m.pot}">${m.pot}</span><span class="tag">${esc(m.esp)}</span>${m.cumplido?'<span class="st ok">✓ visitado</span>':''}</div>
+    <div class="dm">${t?`🕘 ${t} · `:''}${esc(m.lugarVisita)}${m.inst?' · '+esc(m.inst):''}${stopDom&&m.dom!==stopDom?` · 📍 ${esc(m.dom)}`:''}</div>
+    <div class="why">${esc(porQue(m))}</div></div>
+    <button class="btn" data-ficha="${m.id}" style="padding:4px 8px;font-size:12.5px">Ficha</button></div>`;
+}
+function stopHtml(s,i,wd,check,prev){
+  const h=s.ini<2400?`${String(s.ini).padStart(4,'0').replace(/(\d\d)(\d\d)/,'$1:$2')}`:'';
+  const abierto = HORA_MIN>0 && s.ini<HORA_MIN;
+  return `<div class="stop"><div class="stop-h"><div class="stop-n">${i+1}</div>
+    <div class="stop-t"><b>${esc(s.docs[0].dom)}</b><small>${prev?`🚗 ${Math.round(km(prev,s))} min desde la anterior · `:''}${s.docs.length} médico${s.docs.length>1?'s':''}${abierto?' · abierto ahora':(h?' · desde '+h:'')}${s.docs[0].geoNivel==='localidad'?' · ⚠ ubicación aproximada':''}</small></div>
+    <a class="btn sec" href="${gmapsOne(s.docs[0])}" target="_blank" rel="noopener">Ir</a></div>
+    ${s.docs.map(m=>docRow(m,wd,check,s.docs[0].dom)).join('')}</div>`;
+}
+
+/* ===== HOY ===== */
+function renderHoy(){
+  const f=parseD($('#hoyFecha').value), cap=+$('#cap').value||13, wd=f.getDay();
+  if(wd===0||wd===6){ $('#hoyLista').innerHTML='<div class="card">Fin de semana: elegí un día hábil.</div>'; $('#hoyBtns').innerHTML=''; $('#hoyInfo').textContent=''; $('#hoyWarn').innerHTML=''; return; }
+  const fin=new Date(f.getFullYear(), f.getMonth()+1, 0, 12);
+  const pend=M.filter(m=>!m.cumplido);
+  const hoyStr=iso(new Date());
+  // los días previos del ciclo (desde hoy real) consumen pendientes, para que cada día muestre su parte
+  const fechas=diasHabiles(parseD(hoyStr)>f?f:parseD(hoyStr), fin);
+  // el plan del ciclo se arma con turnos completos; el día de hoy se rearma solo con lo que sigue abierto
+  const plan=planificar(fechas,pend,cap);
+  let dia=plan.dias.find(d=>iso(d.fecha)===iso(f));
+  const esHoy=iso(f)===hoyStr;
+  if(esHoy){ const ahora=new Date(); HORA_MIN=ahora.getHours()*100+ahora.getMinutes()+20; if(HORA_MIN%100>=60) HORA_MIN+=40;
+    dia=planDia(f,pend,cap); }   // HORA_MIN queda puesto mientras se dibuja hoy (oculta turnos ya cerrados)
+  if(!dia) dia=planDia(f,pend,cap);
+  $('#hoyInfo').textContent=dia&&dia.n?`${esHoy?'desde ahora · ':''}${DIAS_L[wd]} · zona ${dia.zona} · ${dia.n} visitas · ${dia.stops.length} paradas · ~${Math.round(dia.km)} min de manejo entre paradas`:'';
+  const quedan=fechas.length*cap;
+  $('#hoyWarn').innerHTML = pend.length>quedan ? `<div class="warn">Quedan <b>${pend.length}</b> médicos pendientes y <b>${fechas.length}</b> días hábiles en el ciclo (~${quedan} visitas). No alcanza para todos: el plan prioriza por oportunidad y días sin visita.</div>`:'';
+  if(!dia||!dia.n){ HORA_MIN=0; $('#hoyLista').innerHTML=`<div class="card">${esHoy?'No quedan pendientes con consultorio abierto hoy a esta hora. Mirá el plan de mañana.':'No hay pendientes que atiendan este día.'}</div>`; $('#hoyBtns').innerHTML=''; return; }
+  $('#hoyBtns').innerHTML=`<a class="btn" target="_blank" rel="noopener" href="${gmapsDir(dia.stops.slice(0,10))}">🗺 Ruta del día en Google Maps</a>${dia.stops.length>10?`<a class="btn sec" target="_blank" rel="noopener" href="${gmapsDir(dia.stops.slice(9))}">Ruta (2ª parte)</a>`:''}`;
+  $('#hoyLista').innerHTML=dia.stops.map((s,i,a)=>stopHtml(s,i,wd,true,a[i-1])).join('');
+  HORA_MIN=0;
+}
+document.addEventListener('change',e=>{
+  if(e.target.matches('.doc input[type=checkbox]')){ const id=e.target.closest('.doc').dataset.id, k='v:'+iso(new Date())+':'+id;
+    e.target.checked?ST.put(k,1):ST.del(k); e.target.closest('.doc').classList.toggle('done',e.target.checked); }
+});
+document.addEventListener('click',e=>{ const b=e.target.closest('[data-ficha]'); if(b){ ficha(byId[b.dataset.ficha]); } });
+
+/* ===== PLAN CICLO ===== */
+let semPlan=null, semSel=0;
+function renderSemana(){
+  const cap=+$('#cap').value||13, hoy=parseD(iso(new Date()));
+  let fechas,pool;
+  if($('#modo').value==='resto'){ fechas=diasHabiles(hoy,new Date(hoy.getFullYear(),hoy.getMonth()+1,0,12)); pool=M.filter(m=>!m.cumplido); }
+  else { const a=new Date(hoy.getFullYear(),hoy.getMonth()+1,1,12); fechas=diasHabiles(a,new Date(a.getFullYear(),a.getMonth()+1,0,12)); pool=M.slice(); }
+  semPlan=planificar(fechas,pool,cap); semSel=0;
+  const s=semPlan.sobran;
+  $('#semWarn').innerHTML=s.length?`<div class="warn">${s.length} médicos no entran en el plan${$('#modo').value==='resto'?' de este ciclo':''} con ${cap} visitas por día. Los que quedan afuera son los de menor prioridad${s.some(m=>m.pot==='A')?`, pero hay <b>${s.filter(m=>m.pot==='A').length} de potencial A</b>`:''}.</div>`:'<div class="muted" style="margin-bottom:10px">Entran todos.</div>';
+  $('#semDias').innerHTML=semPlan.dias.map((d,i)=>`<button data-i="${i}" class="${i===0?'on':''}"><b>${DIAS[d.fecha.getDay()]} ${d.fecha.getDate()}/${d.fecha.getMonth()+1}</b><small>${d.n} visitas · ${esc(d.zona)} · ${Math.round(d.km)}′</small></button>`).join('');
+  semDet();
+}
+function semDet(){ const d=semPlan.dias[semSel]; if(!d){$('#semDetalle').innerHTML='';return;}
+  document.querySelectorAll('#semDias button').forEach((b,i)=>b.classList.toggle('on',i===semSel));
+  $('#semDetalle').innerHTML=d.n?`<div style="margin:6px 0 12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center"><b>${DIAS_L[d.fecha.getDay()]} ${d.fecha.toLocaleDateString('es-AR')}</b><span class="muted">${d.zona} · ${d.stops.length} paradas · ~${Math.round(d.km)} min de manejo</span><a class="btn sec" target="_blank" rel="noopener" href="${gmapsDir(d.stops.slice(0,10))}">Ruta en Google Maps</a></div>`+d.stops.map((s,i,a)=>stopHtml(s,i,d.fecha.getDay(),false,a[i-1])).join(''):'<p class="muted">Sin visitas posibles ese día.</p>';
+}
+$('#semDias').addEventListener('click',e=>{const b=e.target.closest('button');if(b){semSel=+b.dataset.i;semDet();}});
+$('#modo').addEventListener('change',renderSemana);
+
+/* ===== MAPA ===== */
+let map, capa;
+function renderMapa(){
+  if(!map){ map=L.map('map'); L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(map); capa=L.layerGroup().addTo(map); }
+  const est=$('#mEstado').value, esp=$('#mEsp').value, pot=$('#mPot').value, dia=+$('#mDia').value;
+  const f=M.filter(m=>(!est||(est==='ok')===m.cumplido)&&(!esp||m.esp===esp)&&(!pot||m.pot===pot)&&(!dia||turnoDia(m,dia).length));
+  const L2={}; f.forEach(m=>{ if(m.lat==null) return; (L2[m.lugar]=L2[m.lugar]||{lat:m.lat,lon:m.lon,docs:[]}).docs.push(m); });
+  capa.clearLayers(); const pts=[];
+  Object.values(L2).forEach(s=>{
+    const pend=s.docs.filter(m=>!m.cumplido).length, tot=s.docs.length;
+    const col= pend===0?css('--good'): pend===tot?css('--critical'):css('--warning');
+    const pres=s.docs.reduce((a,m)=>a+m.pres,0);
+    const r=6+Math.sqrt(pres)/5;
+    const c=L.circleMarker([s.lat,s.lon],{radius:Math.min(r,28),color:css('--surface-1'),weight:2,fillColor:col,fillOpacity:.85});
+    const aprox=s.docs[0].geoNivel==='localidad'?'<br><small>⚠ ubicación aproximada (centro de la localidad)</small>':'';
+    c.bindPopup(`<b>${esc(s.docs[0].dom)}</b>${aprox}<br>${tot} médicos · ${pend} pendientes · ${fmt(pres)} recetas<hr style="margin:6px 0">`+
+      s.docs.sort((a,b)=>b.prior-a.prior).map(m=>`<div style="margin:3px 0">${m.cumplido?'✅':'🔴'} <a href="#" data-ficha="${m.id}">${esc(m.nombre)}</a> <small>${m.esp} · ${m.pot} · ${esc(m.horarioTxt)}</small></div>`).join(''),{maxWidth:340});
+    c.addTo(capa); pts.push([s.lat,s.lon]);
+  });
+  $('#mSinGeo').textContent=f.filter(m=>m.lat==null).length?`· ${f.filter(m=>m.lat==null).length} sin ubicación`:'';
+  map.invalidateSize();
+  if(pts.length && !map._fit){ map.fitBounds(pts,{padding:[20,20]}); map._fit=true; }
+}
+['#mEstado','#mEsp','#mPot','#mDia'].forEach(s=>$(s).addEventListener('change',renderMapa));
+document.getElementById('map').addEventListener('click',e=>{const a=e.target.closest('a[data-ficha]'); if(a){e.preventDefault(); ficha(byId[a.dataset.ficha]);}});
+
+/* ===== TABLERO ===== */
+let charts={};
+function mk(id,cfg){ if(charts[id]) charts[id].destroy(); charts[id]=new Chart(document.getElementById(id),cfg); }
+function renderTablero(){
+  Chart.defaults.font.family=getComputedStyle(document.body).fontFamily; Chart.defaults.color=css('--text-secondary'); Chart.defaults.borderColor=css('--border');
+  const tot=M.length, vis=M.filter(m=>m.cumplido).length, pend=tot-vis;
+  const hoy=parseD(iso(new Date())); const habiles=diasHabiles(hoy,new Date(hoy.getFullYear(),hoy.getMonth()+1,0,12)).length;
+  const porDia={}; M.forEach(m=>m.visitas.forEach(v=>porDia[v]=(porDia[v]||0)+1));
+  const diasT=Object.keys(porDia).sort(); const prom=diasT.length?Object.values(porDia).reduce((a,b)=>a+b,0)/diasT.length:0;
+  const A=M.filter(m=>m.pot==='A'), Apend=A.filter(m=>!m.cumplido).length;
+  const presTot=M.reduce((a,m)=>a+m.pres,0), shareW=M.reduce((a,m)=>a+m.pres*m.share,0)/presTot;
+  const abandon=M.filter(m=>m.diasSin>=60).length;
+  $('#kpis').innerHTML=[
+    ['Ciclo '+D.meta.ciclo+': visitados',`${vis}<span class="muted" style="font-size:16px"> / ${tot}</span>`,`${Math.round(vis/tot*100)}% cobertura`,vis/tot],
+    ['Pendientes',pend,`${habiles} días hábiles → ${habiles?Math.ceil(pend/habiles):'—'} por día`,null],
+    ['Ritmo histórico',prom.toFixed(1),'visitas por día trabajado',null],
+    ['Potencial A pendientes',Apend,`de ${A.length} médicos A`,null],
+    ['Participación Baliarda',shareW.toFixed(1)+'%','ponderada por recetas',null],
+    ['Recetas de la cartera',fmt(presTot),'total auditado',null],
+    ['Sin visita hace 60+ días',abandon,'médicos a recuperar',null],
+    ['Lugares de visita',new Set(M.map(m=>m.lugar)).size,`${M.filter(m=>m.tipo==='Gira').length} médicos de gira`,null],
+  ].map(([l,v,s,p])=>`<div class="kpi"><div class="l">${l}</div><div class="v">${v}</div><div class="s">${s}</div>${p!=null?`<div class="bar"><i style="width:${p*100}%"></i></div>`:''}</div>`).join('');
+
+  const meses=['01','02','03','04','05','06','07','08','09','10','11','12'], nombres=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+  const cob=meses.map(mm=>M.filter(m=>m.visitas.some(v=>v.slice(5,7)===mm)).length);
+  const idx=meses.map((_,i)=>i).filter(i=>cob[i]>0);
+  const ac=css('--series-1'), ac2=css('--series-2');
+  const barOpts=(extra={})=>({maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,grid:{color:css('--border')}},x:{grid:{display:false}}},...extra});
+  mk('cCob',{type:'bar',data:{labels:idx.map(i=>nombres[i]),datasets:[{data:idx.map(i=>Math.round(cob[i]/tot*100)),backgroundColor:ac,borderRadius:4,maxBarThickness:42}]},
+    options:barOpts({plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${c.raw}% (${cob[idx[c.dataIndex]]} médicos)`}}},scales:{y:{max:100,ticks:{callback:v=>v+'%'},grid:{color:css('--border')}},x:{grid:{display:false}}}})});
+  const ult=diasT.slice(-60);
+  mk('cDia',{type:'bar',data:{labels:ult.map(d=>d.slice(8)+'/'+d.slice(5,7)),datasets:[
+      {type:'line',data:ult.map(()=>+prom.toFixed(1)),borderColor:css('--text-secondary'),borderWidth:1.5,borderDash:[4,4],pointRadius:0,label:'Promedio'},
+      {data:ult.map(d=>porDia[d]),backgroundColor:ac,borderRadius:3,label:'Visitas'}]},options:barOpts()});
+  const pots=['A','B','C'];
+  const stack=(labels,fn)=>({labels,datasets:[
+      {label:'Visitados',data:labels.map(l=>fn(l).filter(m=>m.cumplido).length),backgroundColor:css('--series-1'),borderRadius:4,borderColor:css('--surface-1'),borderWidth:{top:2}},
+      {label:'Pendientes',data:labels.map(l=>fn(l).filter(m=>!m.cumplido).length),backgroundColor:css('--series-2'),borderRadius:4,borderColor:css('--surface-1'),borderWidth:{top:2}}]});
+  const stackOpts=(h)=>({maintainAspectRatio:false,indexAxis:h?'y':'x',plugins:{legend:{display:true,position:'top',align:'start',labels:{boxWidth:12}}},scales:{x:{stacked:true,grid:{display:!h?false:true,color:css('--border')}},y:{stacked:true,ticks:{autoSkip:false},grid:{display:h?false:true,color:css('--border')}}}});
+  mk('cPot',{type:'bar',data:stack(pots.map(p=>'Potencial '+p),l=>M.filter(m=>'Potencial '+m.pot===l)),options:stackOpts(false)});
+  const esps=Object.entries(M.reduce((a,m)=>(a[m.espNombre]=(a[m.espNombre]||0)+1,a),{})).sort((a,b)=>b[1]-a[1]).map(e=>e[0]);
+  mk('cEsp',{type:'bar',data:stack(esps,l=>M.filter(m=>m.espNombre===l)),options:stackOpts(true)});
+  const potCol={A:css('--series-1'),B:css('--series-2'),C:css('--series-3')};
+  mk('cScat',{type:'scatter',data:{datasets:pots.map(p=>({label:'Potencial '+p,data:M.filter(m=>m.pot===p&&m.pres>0).map(m=>({x:m.pres,y:m.share,m})),backgroundColor:potCol[p],borderColor:css('--surface-1'),borderWidth:1.5,pointRadius:5,pointHoverRadius:7}))},
+    options:{maintainAspectRatio:false,onClick:(e,els)=>{if(els[0]) ficha(els[0].element.$context.raw.m);},plugins:{legend:{position:'top',align:'start',labels:{boxWidth:12}},tooltip:{callbacks:{label:c=>`${c.raw.m.nombre}: ${fmt(c.raw.x)} recetas, ${c.raw.y}% Baliarda`}}},
+      scales:{x:{type:'logarithmic',title:{display:true,text:'Recetas totales (escala log)'},grid:{color:css('--border')}},y:{title:{display:true,text:'% Baliarda'},beginAtZero:true,grid:{color:css('--border')}}}}});
+  const sp=[0,1,2,3].map(i=>M.reduce((a,m)=>a+m.pres*(m.tps[i]||0),0)/presTot);
+  mk('cShare',{type:'bar',data:{labels:['TP1','TP2','TP3','TP4','Actual'],datasets:[{data:[...sp,shareW].map(v=>+v.toFixed(2)),backgroundColor:[ac,ac,ac,ac,css('--series-2')],borderRadius:4,maxBarThickness:46}]},
+    options:{maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.raw+'%'}}},scales:{y:{beginAtZero:true,ticks:{callback:v=>v+'%'},grid:{color:css('--border')}},x:{grid:{display:false}}}}});
+  const locs=Object.entries(M.reduce((a,m)=>(a[m.loc]=(a[m.loc]||0)+1,a),{})).sort((a,b)=>b[1]-a[1]).map(e=>e[0]);
+  mk('cLoc',{type:'bar',data:stack(locs,l=>M.filter(m=>m.loc===l)),options:stackOpts(true)});
+  const rangos=[['0–15',0,15],['16–30',16,30],['31–45',31,45],['46–60',46,60],['61–90',61,90],['90+',91,9999]];
+  mk('cSin',{type:'bar',data:{labels:rangos.map(r=>r[0]+' días'),datasets:[{data:rangos.map(r=>M.filter(m=>m.diasSin>=r[1]&&m.diasSin<=r[2]).length),backgroundColor:rangos.map((r,i)=>i<3?ac:(i<4?css('--warning'):css('--critical'))),borderRadius:4,maxBarThickness:46}]},options:barOpts()});
+
+  const mini=(arr,cols)=>`<table><thead><tr>${cols.map(c=>`<th class="${c[2]||''}">${c[0]}</th>`).join('')}</tr></thead><tbody>${arr.map(m=>`<tr data-ficha="${m.id}">${cols.map(c=>`<td class="${c[2]||''}">${c[1](m)}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+  const est=m=>m.cumplido?'<span class="st ok">✓</span>':'<span class="st pend">● pend.</span>';
+  $('#tOport').innerHTML=mini(M.slice().sort((a,b)=>b.oport-a.oport).slice(0,15),[['Médico',m=>esc(m.nombre)+` <span class="tag ${m.pot}">${m.pot}</span>`],['Esp',m=>m.esp],['Recetas',m=>fmt(m.pres),'n'],['% Bal.',m=>m.share+'%','n'],['Ciclo',est]]);
+  $('#tBaja').innerHTML=mini(M.filter(m=>m.caida>=3&&m.pres>=50).sort((a,b)=>b.caida*Math.log1p(b.pres)-a.caida*Math.log1p(a.pres)).slice(0,15),[['Médico',m=>esc(m.nombre)],['Recetas',m=>fmt(m.pres),'n'],['Mejor período',m=>Math.max(...m.tps)+'%','n'],['Actual',m=>m.share+'%','n'],['Ciclo',est]]);
+  const inst={}; M.forEach(m=>{const k=m.inst||m.dom; (inst[k]=inst[k]||[]).push(m);});
+  const ins=Object.entries(inst).filter(([k,a])=>a.length>=3).sort((a,b)=>b[1].length-a[1].length).slice(0,15);
+  $('#tInst').innerHTML=`<table><thead><tr><th>Institución / domicilio</th><th class="n">Médicos</th><th class="n">Pendientes</th><th class="n">Recetas</th><th class="n">% Bal.</th></tr></thead><tbody>${ins.map(([k,a])=>{const p=a.reduce((s,m)=>s+m.pres,0);return `<tr style="cursor:default"><td>${esc(k)}</td><td class="n">${a.length}</td><td class="n">${a.filter(m=>!m.cumplido).length}</td><td class="n">${fmt(p)}</td><td class="n">${p?(a.reduce((s,m)=>s+m.pres*m.share,0)/p).toFixed(1):0}%</td></tr>`}).join('')}</tbody></table>`;
+}
+$('#tablero').addEventListener('click',e=>{const r=e.target.closest('tr[data-ficha]'); if(r) ficha(byId[r.dataset.ficha]);});
+
+/* ===== MEDICOS ===== */
+const COLS=[['Médico','nombre'],['Esp','esp'],['Pot','pot'],['Cat','cat'],['Recetas','pres','n'],['% Bal.','share','n'],['Oport.','oport','n'],['Últ. visita','ultima'],['Días','diasSin','n'],['Ciclo','cumplido'],['Localidad','loc'],['Horario','horarioTxt']];
+let sortK='prior', sortD=-1;
+function renderMedicos(){
+  const q=$('#q').value.toLowerCase(), e=$('#fEsp').value, s=$('#fEst').value, l=$('#fLoc').value;
+  const f=M.filter(m=>(!q||(m.nombre+' '+m.matr+' '+m.dom+' '+(m.inst||'')).toLowerCase().includes(q))&&(!e||m.esp===e)&&(!s||(s==='ok')===m.cumplido)&&(!l||m.loc===l))
+    .sort((a,b)=>{const x=a[sortK],y=b[sortK]; return (x>y?1:x<y?-1:0)*sortD;});
+  $('#tabla thead').innerHTML='<tr>'+COLS.map(c=>`<th class="${c[2]||''}" data-k="${c[1]}">${c[0]}${sortK===c[1]?(sortD>0?' ▲':' ▼'):''}</th>`).join('')+'</tr>';
+  $('#tabla tbody').innerHTML=f.map(m=>`<tr data-ficha="${m.id}"><td>${esc(m.nombre)}</td><td>${m.esp}</td><td><span class="tag ${m.pot}">${m.pot}</span></td><td>${m.cat}</td><td class="n">${fmt(m.pres)}</td><td class="n">${m.share}%</td><td class="n">${m.oport}</td><td>${m.ultima?m.ultima.slice(8)+'/'+m.ultima.slice(5,7):'—'}</td><td class="n">${m.diasSin}</td><td>${m.cumplido?'<span class="st ok">✓</span>':'<span class="st pend">● pend.</span>'}</td><td>${esc(m.loc)}</td><td class="muted">${esc(m.horarioTxt)}</td></tr>`).join('');
+  $('#tCount').textContent=`${f.length} médicos`;
+}
+$('#tabla thead').addEventListener('click',e=>{const th=e.target.closest('th');if(!th)return; const k=th.dataset.k; if(sortK===k) sortD*=-1; else {sortK=k; sortD=['nombre','esp','pot','cat','loc','horarioTxt'].includes(k)?1:-1;} renderMedicos();});
+$('#tabla tbody').addEventListener('click',e=>{const r=e.target.closest('tr');if(r) ficha(byId[r.dataset.ficha]);});
+['#q','#fEsp','#fEst','#fLoc'].forEach(s=>$(s).addEventListener('input',renderMedicos));
+
+/* ===== FICHA ===== */
+function ficha(m){ if(!m) return;
+  $('#dlgTit').innerHTML=`<div style="font-size:17px;font-weight:700">${esc(m.nombre)}</div><div class="muted">${esc(m.espNombre)} · Mat. ${esc(m.matr)} · <span class="tag ${m.pot}">Potencial ${m.pot}</span><span class="tag">Cat. ${esc(m.cat)}</span>${m.pami?'<span class="tag">PAMI</span>':''}</div>`;
+  const vis=m.visitas.map(v=>`<span>${v.slice(8)}/${v.slice(5,7)}</span>`).join('')||'<span>sin visitas registradas</span>';
+  $('#dlgBody').innerHTML=`<div class="kv">
+    <div>Estado del ciclo</div><div>${m.cumplido?'<span class="st ok">✓ Visitado</span>':'<span class="st pend">● Pendiente</span>'} · ${m.diasSin} días desde la última visita</div>
+    <div>Domicilio</div><div>${esc(m.dom)} <a href="${gmapsOne(m)}" target="_blank" rel="noopener">mapa ↗</a>${m.geoNivel==='localidad'?' <small class="muted">(ubicación aproximada)</small>':''}</div>
+    <div>Institución</div><div>${esc(m.inst||'—')} · ${esc(m.lugarVisita)} · ${esc(m.tipo)}</div>
+    <div>Atiende</div><div>${esc(m.horarioTxt)}</div>
+    <div>Recetas</div><div>${fmt(m.pres)} · <b>${m.share}% Baliarda</b> · períodos TP1–TP4: ${m.tps.map(t=>t+'%').join(' · ')}</div>
+    <div>Oportunidad</div><div>${m.oport}/100 · prioridad ${m.prior}/100</div>
+    <div>Por qué</div><div>${esc(porQue(m))||'—'}</div>
+    <div>Visitas ${D.meta.anio}</div><div><div class="timeline">${vis}</div></div>
+  </div>`;
+  $('#dlg').showModal();
+}
+
+/* ===== INIT ===== */
+document.getElementById('tabs').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;
+  document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('on',x===b));
+  document.querySelectorAll('main section').forEach(s=>s.classList.toggle('on',s.id===b.dataset.t));
+  ({hoy:renderHoy,semana:renderSemana,mapa:renderMapa,tablero:renderTablero,medicos:renderMedicos})[b.dataset.t]();
+});
+/* ===== DATOS: base embebida en el archivo + actualización con el Excel de CallMed (queda en este navegador) ===== */
+let BASE=null;
+const LS='planificador-visitas:base';
+async function descifrar(cif, pw){
+  const b64=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
+  const km=await crypto.subtle.importKey('raw',new TextEncoder().encode(pw),'PBKDF2',false,['deriveKey']);
+  const key=await crypto.subtle.deriveKey({name:'PBKDF2',salt:b64(cif.salt),iterations:cif.iter,hash:'SHA-256'},km,{name:'AES-GCM',length:256},false,['decrypt']);
+  const txt=await crypto.subtle.decrypt({name:'AES-GCM',iv:b64(cif.iv)},key,b64(cif.ct));
+  return JSON.parse(new TextDecoder().decode(txt));
+}
+function pedirClave(cif){
+  return new Promise(res=>{
+    const d=$('#dlgClave'), f=$('#formClave'), err=$('#claveErr');
+    f.onsubmit=async ev=>{ ev.preventDefault(); err.textContent='Abriendo…';
+      try{ const b=await descifrar(cif,$('#clave').value.trim()); d.close(); res(b); }
+      catch(e){ err.textContent='Clave incorrecta. Probá de nuevo.'; } };
+    d.addEventListener('cancel',e=>e.preventDefault());
+    d.showModal(); setTimeout(()=>$('#clave').focus(),50);
+  });
+}
+async function cargarBase(){
+  let loc=null; try{ loc=JSON.parse(ST.get(LS)||'null'); }catch(e){}
+  const el=document.getElementById('base-emb');
+  if(el && el.textContent.trim().startsWith('{')){            // archivo para PC: datos adentro
+    const emb=JSON.parse(el.textContent);
+    return (loc && loc.fecha > emb.fecha) ? {...loc, manual:emb.manual, origen:'actualizado'} : {...emb, origen:'archivo'};
+  }
+  const cif=await fetch('datos.cif.json',{cache:'no-store'}).then(r=>r.ok?r.json():null).catch(()=>null);
+  if(cif){                                                    // versión web: datos cifrados, se abren con la clave
+    if(loc && loc.fecha >= cif.fecha) return {...loc, origen:'guardado'};
+    const b=await pedirClave(cif);
+    const guardar={filas:b.filas, geo:b.geo, tiempos:b.tiempos, fecha:b.fecha, apm:b.apm, manual:b.manual};
+    if(loc && loc.fecha > b.fecha) return {...loc, origen:'guardado'};
+    ST.put(LS, JSON.stringify(guardar));
+    return {...guardar, origen:'web'};
+  }
+  const emb=await fetch('base.json',{cache:'no-store'}).then(r=>r.json());   // desarrollo
+  return (loc && loc.fecha > emb.fecha) ? {...loc, manual:emb.manual, origen:'actualizado'} : {...emb, origen:'archivo'};
+}
+function olvidarDatos(){ if(confirm('¿Borrar los datos guardados en este equipo? La próxima vez va a pedir la clave (o usar los datos del archivo).')){ ST.del(LS); location.reload(); } }
+function aplicarBase(b){
+  BASE=b; T=b.tiempos; TI={}; if(T) T.keys.forEach((k,i)=>TI[k]=i);
+  M=construirMedicos(b.filas,b.geo); byId={}; M.forEach(m=>byId[m.id]=m);
+  const hoy=new Date();
+  D={meta:{laboratorio:'Baliarda', zona:b.filas[0]?.DBZONA||'', apm:b.apm||'', ciclo:hoy.getMonth()+1, anio:hoy.getFullYear(), generado:b.fecha}};
+  $('#sub').textContent=`${D.meta.laboratorio} · Zona ${D.meta.zona}${D.meta.apm?' · '+D.meta.apm:''} · datos CallMed del ${new Date(b.fecha).toLocaleString('es-AR',{dateStyle:'short',timeStyle:'short'})}`;
+  ['#mEsp','#fEsp'].forEach(s=>{ const sel=$(s); while(sel.options.length>1) sel.remove(1); });
+  const sl=$('#fLoc'); while(sl.options.length>1) sl.remove(1);
+  [...new Set(M.map(m=>m.esp))].sort().forEach(e=>{ const n=M.find(m=>m.esp===e).espNombre; $('#mEsp').add(new Option(n,e)); $('#fEsp').add(new Option(n,e)); });
+  [...new Set(M.map(m=>m.loc))].sort().forEach(l=>sl.add(new Option(l,l)));
+  if(map){ map._fit=false; }
+  const activa=document.querySelector('nav button.on')?.dataset.t||'hoy';
+  ({hoy:renderHoy,semana:renderSemana,mapa:renderMapa,tablero:renderTablero,medicos:renderMedicos})[activa]();
+}
+function progreso(t){ $('#prog').textContent=t; }
+$('#btnActualizar').addEventListener('click',()=>$('#fileExcel').click());
+$('#fileExcel').addEventListener('change',async e=>{
+  const f=e.target.files[0]; e.target.value=''; if(!f) return;
+  $('#dlgProg').showModal(); progreso('Leyendo el Excel…'); $('#progOk').hidden=true;
+  try{
+    const r=await actualizarDesdeExcel(f,BASE,progreso);
+    const nb={filas:r.filas, geo:r.geo, tiempos:r.tiempos, fecha:r.fecha, apm:BASE.apm, manual:BASE.manual};
+    const guardado=ST.put(LS,JSON.stringify(nb));
+    aplicarBase({...nb, manual:BASE.manual, origen:'actualizado'});
+    const vis=M.filter(m=>m.cumplido).length;
+    progreso(`Listo: ${M.length} médicos, ${vis} visitados en el ciclo.${r.nuevos?` ${r.nuevos} direcciones nuevas ubicadas.`:''}${r.recalculoTiempos?' Tiempos de manejo recalculados.':''}${guardado?'':' ⚠ Este navegador no deja guardar: al cerrar la página vuelve a los datos que trae el archivo.'}`);
+  }catch(err){ progreso('No se pudo actualizar: '+err.message); }
+  $('#progOk').hidden=false;
+});
+cargarBase().then(b=>{
+  let h=new Date(); while(h.getDay()===0||h.getDay()===6) h.setDate(h.getDate()+1);
+  $('#hoyFecha').value=iso(new Date(h.getFullYear(),h.getMonth(),h.getDate(),12));
+  $('#hoyFecha').addEventListener('change',renderHoy); $('#cap').addEventListener('change',()=>{ ST.put('planificador-visitas:cap',$('#cap').value); renderHoy(); if(semPlan) renderSemana();});
+  const cap=ST.get('planificador-visitas:cap'); if(cap) $('#cap').value=cap;
+  aplicarBase(b);
+}).catch(err=>{ document.querySelector('main').innerHTML=`<div class="card">No se pudieron cargar los datos: ${esc(err.message)}</div>`; });
+</script>
+</body>
+</html>
